@@ -87,7 +87,7 @@ import os
 import time
 
 class SartopoSession():
-    def __init__(self,domainAndPort="localhost:8080",mapID=None,configpath=None,account=None,id=None,key=None):
+    def __init__(self,domainAndPort="localhost:8080",mapID=None,ext=None,configpath=None,account=None,id=None,key=None):
         self.s=requests.session()
         self.apiVersion=-1
         print("IN SARTOPO SESSION")
@@ -102,6 +102,7 @@ class SartopoSession():
         self.account=account
         self.id=id
         self.key=key
+        self.ext=ext
         self.setupSession()
         
     def setupSession(self):
@@ -162,7 +163,7 @@ class SartopoSession():
         #     response code 200 = old API
         
         self.apiUrlMid="/invalid/"
-        url="https://"+self.domainAndPort+"/api/v1/map/"
+        url="http://"+self.domainAndPort+"/api/v1/map/"
         print("searching for API v1: sending get to "+url)
         try:
             r=self.s.get(url,timeout=2)
@@ -172,12 +173,13 @@ class SartopoSession():
             print("response code = "+str(r.status_code))
             if r.status_code==200:
                 # now validate the mapID, since the initial test doesn't care about mapID
-                mapUrl="https://"+self.domainAndPort+"/m/"+self.mapID
+                mapUrl="http://"+self.domainAndPort+"/m/"+self.mapID
                 try:
                     r=self.s.get(mapUrl,timeout=2)
                 except:
-                    print("API version 1 detected, but the mapID is not valid.")
+                    print("API version 1 detected, but the mapID is not valid:"+mapUrl+":")
                 else:
+                    print("DATA:"+str(r))
                     if r.status_code==200:
                         # now we know the API is valid and the mapID is valid
                         self.apiVersion=1
@@ -185,7 +187,7 @@ class SartopoSession():
                     else:
                         print("API version 1 detected, but the map-specific URL returned a code of "+str(r.status_code)+" so this session is not valid.")
             else:
-                url="https://"+self.domainAndPort+"/rest/marker/"
+                url="http://"+self.domainAndPort+"/rest/marker/"
                 print("searching for API v0: sending get to "+url)
                 try:
                     r=self.s.get(url,timeout=2)
@@ -197,7 +199,7 @@ class SartopoSession():
                         self.apiVersion=0
                         self.apiUrlMid="/rest/"
                         # for v0, send a get to the map URL to authenticate the session
-                        url="https://"+self.domainAndPort+"/m/"+self.mapID
+                        url="http://"+self.domainAndPort+"/m/"+self.mapID ## +self.ext
                         print("sending API v0 authentication request to url "+url)
                         try:
                             r=self.s.get(url,timeout=2)
@@ -222,9 +224,9 @@ class SartopoSession():
         #  destination and also a part of the pre-hased data for signed requests
         if id!="": # sending online request with slash at the end causes failure
             apiUrlEnd=apiUrlEnd
-            #######apiUrlEnd=apiUrlEnd+"/"+str(id)
-        mid=self.apiUrlMid.replace("[MAPID]",self.mapID)
-        url="https://"+self.domainAndPort+mid+apiUrlEnd
+            apiUrlEnd=apiUrlEnd+"/"+str(id)
+        mid=self.apiUrlMid.replace("[MAPID]",self.mapID) ## +self.ext)
+        url="http://"+self.domainAndPort+mid+apiUrlEnd
         print("sending "+str(typex)+" to "+url)
         if typex is "post":
             params={}
@@ -248,7 +250,24 @@ class SartopoSession():
 #             print("SENDING GET to '"+url+"':")
             r=self.s.get(url,timeout=2)
         elif typex is "delete":
-            r=self.s.delete(url,timeout=2)
+            params={}
+            if "sartopo.com" in self.domainAndPort.lower():
+                expires=int(time.time()*1000)+120000 # 2 minutes from current time, in milliseconds
+                data="DELETE "+mid+apiUrlEnd+"\n"+str(expires)+"\n"  #last newline needed as placeholder for json
+                print("pre-hashed data:"+data)                
+                token=hmac.new(base64.b64decode(self.key),data.encode(),'sha256').digest()
+                token=base64.b64encode(token).decode()
+#                 print("hashed data:"+str(token))
+                params["json"]=''   # no body, but is required
+                params["id"]=self.id
+                params["expires"]=expires
+                params["signature"]=token
+                print("SENDING DELETE to '"+url+"':")
+                print(json.dumps(params,indent=3))
+                print("Key:"+str(self.key))
+            r=self.s.delete(url,params=params,timeout=2)   ## use params for query vs data for body data
+            print("URL:"+str(url))
+            print("Ris:"+str(r))
         else:
             print("Unrecognized request type:"+str(typex))
             return -1
@@ -345,8 +364,13 @@ class SartopoSession():
             return self.sendRequest("post","since/"+str(since),j,id=str(existingId),returnJson="ID")
 
     def delMarker(self,existingId=""):
-#         print("sending json: "+json.dumps(j.json(),indent=3))
         return self.sendRequest("delete","marker",None,id=existingId,returnJson="ALL")
+
+
+    def delObject(self,objType,existingId=""):
+        print("In delete:"+objType+":"+str(existingId))
+        ###return self.sendRequest("delete","since/0",None,id=str(existingId),returnJson="ALL")
+        return self.sendRequest("delete",objType,None,id=str(existingId),returnJson="ALL")
 
 
     def getFeatures(self,featureClass=None,since=0):

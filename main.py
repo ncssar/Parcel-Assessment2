@@ -107,7 +107,8 @@ class GPSApp(App):
            if self.ANDROID == 1:
               request_permissions([Permission.READ_EXTERNAL_STORAGE, Permission.ACCESS_FINE_LOCATION, 
                                    Permission.ACCESS_COARSE_LOCATION])
-           self.stsfile = "/storage/emulated/0/kivy/sts.ini"    ## should use more general path resolution
+           self.stsfile = "./sts.ini"    ## should use more general path resolution
+           ###self.stsfile = "/storage/emulated/0/kivy/sts.ini"    ## should use more general path resolution
         return(self.imt)   ##causes window to be displayed
 
     ###def tracker_callback(self, message, *args):
