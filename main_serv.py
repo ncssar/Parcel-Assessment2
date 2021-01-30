@@ -125,6 +125,8 @@ class GPSApp(App):
            self.mURLx = dec_mess[1] 
            self.csignx = dec_mess[2] 
            self.confirm = int(dec_mess[3]) 
+       elif dec_mess[0] == "END_TASK":
+            self.kill = 1
 
     def on_location(self, **kwargs):  ## called at GPS input
         Logger.info("Called on_location SERVICE")
@@ -194,8 +196,8 @@ class GPSApp(App):
             return             # wait for more points
         print("B4 track call service:"+str(self.startTrack))
         self.cnt = self.cnt + len(self.track)
-        result = self.sts.addIncTrack(self.cnt,self.track,self.startTrack,title=self.csignx,description='', \
-                     since=self.since,existingId=self.ID,folderId=self.foldAT)  # new, get id 
+        result = self.sts.addAppTrack(self.track,cnt=self.cnt,startTrack=1,title=self.csignx,description='', \
+                     existingId=self.ID,folderId=self.foldAT)  # new, get id 
 # do we want a parameter to the call to differentiate between normal tracks and AppTracks?
         print("AFT track call:"+str(result))
         if result != None and result != -1:         ## occurred Okay, result is ID

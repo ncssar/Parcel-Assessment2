@@ -26,29 +26,29 @@
 #     from sartopo_python import SartopoSession
 #     import time
 #     
-#     sts=SartopoSession("localhost:8080","<offlineMapID>")
-#     fid=sts.addFolder("MyFolder")
-#     sts.addMarker(39,-120,"stuff")
-#     sts.addMarker(39.01,-120.01,"myStuff",folderId=fid)
-#     r=sts.getFeatures("Marker")
-#     print("r:"+str(r))
-#     print("moving the marker after a pause:"+r[0]['id'])
+#     sts=SartopoSession('localhost:8080','<offlineMapID>')
+#     fid=sts.addFolder('MyFolder')
+#     sts.addMarker(39,-120,'stuff')
+#     sts.addMarker(39.01,-120.01,'myStuff',folderId=fid)
+#     r=sts.getFeatures('Marker')
+#     print('r:'+str(r))
+#     print('moving the marker after a pause:'+r[0]['id'])
 #     time.sleep(5)
 #     sts.addMarker(39.02,-120.02,r[0]['properties']['title'],existingId=r[0]['id'])
 #     
 #     sts2=SartopoSession(
-#         "sartopo.com",
-#         "<onlineMapID>",
-#         configpath="../../sts.ini",
-#         account="<accountName>")
-#     fid2=sts2.addFolder("MyOnlineFolder")
-#     sts2.addMarker(39,-120,"onlineStuff")
-#     sts2.addMarker(39.01,-119.99,"onlineStuff2",folderId=fid2)
-#     r2=sts2.getFeatures("Marker")
-#     print("return value from getFeatures('Marker'):")
+#         'sartopo.com',
+#         '<onlineMapID>',
+#         configpath='../../sts.ini',
+#         account='<accountName>')
+#     fid2=sts2.addFolder('MyOnlineFolder')
+#     sts2.addMarker(39,-120,'onlineStuff')
+#     sts2.addMarker(39.01,-119.99,'onlineStuff2',folderId=fid2)
+#     r2=sts2.getFeatures('Marker')
+#     print('return value from getFeatures('Marker'):')
 #     print(json.dumps(r2,indent=3))
 #     time.sleep(15)
-#     print("moving online after a pause:"+r2[0]['id'])
+#     print('moving online after a pause:'+r2[0]['id'])
 #     sts2.addMarker(39.02,-119.98,r2[0]['properties']['title'],existingId=r2[0]['id'])
 #
 #  REVISION HISTORY
@@ -87,12 +87,11 @@ import os
 import time
 
 class SartopoSession():
-    def __init__(self,domainAndPort="localhost:8080",mapID=None,ext=None,configpath=None,account=None,id=None,key=None):
+    def __init__(self,domainAndPort='localhost:8080',mapID=None,configpath=None,account=None,id=None,key=None):
         self.s=requests.session()
         self.apiVersion=-1
-        print("IN SARTOPO SESSION")
         if not mapID or not isinstance(mapID,str) or len(mapID)<3:
-            print("ERROR: you must specify a three-or-more-character sartopo map ID string (end of the URL) when opening a SartopoSession object.")
+            print('ERROR: you must specify a three-or-more-character sartopo map ID string (end of the URL) when opening a SartopoSession object.')
             return None
         self.mapID=mapID
         self.domainAndPort=domainAndPort
@@ -100,13 +99,13 @@ class SartopoSession():
         #  signed requests for sartopo.com
         self.configpath=configpath
         self.account=account
+        self.queue={}
         self.id=id
         self.key=key
-        self.ext=ext
         self.setupSession()
         
     def setupSession(self):
-        if "sartopo.com" in self.domainAndPort.lower():
+        if 'sartopo.com' in self.domainAndPort.lower():
             id=None
             key=None
             # if configpath and account are specified,
@@ -179,7 +178,6 @@ class SartopoSession():
                 except:
                     print("API version 1 detected, but the mapID is not valid:"+mapUrl+":")
                 else:
-                    print("DATA:"+str(r))
                     if r.status_code==200:
                         # now we know the API is valid and the mapID is valid
                         self.apiVersion=1
@@ -199,7 +197,7 @@ class SartopoSession():
                         self.apiVersion=0
                         self.apiUrlMid="/rest/"
                         # for v0, send a get to the map URL to authenticate the session
-                        url="http://"+self.domainAndPort+"/m/"+self.mapID ## +self.ext
+                        url="http://"+self.domainAndPort+"/m/"+self.mapID
                         print("sending API v0 authentication request to url "+url)
                         try:
                             r=self.s.get(url,timeout=2)
@@ -211,24 +209,28 @@ class SartopoSession():
                                 print("API v0 session is now authenticated")
         print("API version:"+str(self.apiVersion))
         
-    def sendRequest(self,typex,apiUrlEnd,j,id="",returnJson=None):
+    def sendRequest(self,type,apiUrlEnd,j,id="",returnJson=None):
         if self.apiVersion<0:
-            print("sartopo session is invalid; request aborted: type="+str(typex)+" apiUrlEnd="+str(apiUrlEnd))
+            print("sartopo session is invalid; request aborted: type="+str(type)+" apiUrlEnd="+str(apiUrlEnd))
             return -1
-        apiUrlEnd=apiUrlEnd.lower()
-        if self.apiVersion>0:
-            apiUrlEnd=apiUrlEnd.capitalize()
-        if apiUrlEnd.startswith("Since"): # 'since' must be lowercase even in API v1
+        mid=self.apiUrlMid
+        if 'api/' in apiUrlEnd.lower():
+            mid='/'
+        else:
             apiUrlEnd=apiUrlEnd.lower()
+            if self.apiVersion>0:
+                apiUrlEnd=apiUrlEnd.capitalize()
+            if apiUrlEnd.startswith("Since"): # 'since' must be lowercase even in API v1
+                apiUrlEnd=apiUrlEnd.lower()
         # append id (if any) to apiUrlEnd so that it is a part of the request
-        #  destination and also a part of the pre-hased data for signed requests
-        if id!="": # sending online request with slash at the end causes failure
-            apiUrlEnd=apiUrlEnd
-            apiUrlEnd=apiUrlEnd+"/"+str(id)
-        mid=self.apiUrlMid.replace("[MAPID]",self.mapID) ## +self.ext)
+        #  destination and also a part of the pre-hashed data for signed requests
+        if id and id!="": # sending online request with slash at the end causes failure
+            apiUrlEnd=apiUrlEnd+"/"+id
+        mid=mid.replace("[MAPID]",self.mapID)
+        apiUrlEnd=apiUrlEnd.replace("[MAPID]",self.mapID)
         url="http://"+self.domainAndPort+mid+apiUrlEnd
-        print("sending "+str(typex)+" to "+url)
-        if typex is "post":
+        # print("sending "+str(type)+" to "+url)
+        if type=="post":
             params={}
             params["json"]=json.dumps(j)
             if "sartopo.com" in self.domainAndPort.lower():
@@ -237,24 +239,22 @@ class SartopoSession():
                 # print("pre-hashed data:"+data)                
                 token=hmac.new(base64.b64decode(self.key),data.encode(),'sha256').digest()
                 token=base64.b64encode(token).decode()
-#                 print("hashed data:"+str(token))
+                # print("hashed data:"+str(token))
                 params["id"]=self.id
                 params["expires"]=expires
                 params["signature"]=token
-                # print("SENDING POST to '"+url+"':")
-                # print(json.dumps(params,indent=3))
-                # print("Key:"+str(self.key))
+            # print("SENDING POST to '"+url+"':")
+            # print(json.dumps(params,indent=3))
             r=self.s.post(url,data=params,timeout=2)
-            print("Ris:"+str(r))
-        elif typex is "get": # no need for json in GET; sending null JSON causes downstream error
+        elif type=="get": # no need for json in GET; sending null JSON causes downstream error
 #             print("SENDING GET to '"+url+"':")
             r=self.s.get(url,timeout=2)
-        elif typex is "delete":
+        elif type=="delete":
             params={}
             if "sartopo.com" in self.domainAndPort.lower():
                 expires=int(time.time()*1000)+120000 # 2 minutes from current time, in milliseconds
                 data="DELETE "+mid+apiUrlEnd+"\n"+str(expires)+"\n"  #last newline needed as placeholder for json
-                print("pre-hashed data:"+data)                
+                # print("pre-hashed data:"+data)                
                 token=hmac.new(base64.b64decode(self.key),data.encode(),'sha256').digest()
                 token=base64.b64encode(token).decode()
 #                 print("hashed data:"+str(token))
@@ -262,14 +262,14 @@ class SartopoSession():
                 params["id"]=self.id
                 params["expires"]=expires
                 params["signature"]=token
-                print("SENDING DELETE to '"+url+"':")
-                print(json.dumps(params,indent=3))
-                print("Key:"+str(self.key))
+            # print("SENDING DELETE to '"+url+"':")
+            # print(json.dumps(params,indent=3))
+            # print("Key:"+str(self.key))
             r=self.s.delete(url,params=params,timeout=2)   ## use params for query vs data for body data
-            print("URL:"+str(url))
-            print("Ris:"+str(r))
+            # print("URL:"+str(url))
+            # print("Ris:"+str(r))
         else:
-            print("Unrecognized request type:"+str(typex))
+            print("Unrecognized request type:"+str(type))
             return -1
 #         print("response code = "+str(r.status_code))
 #         print("response:")
@@ -285,7 +285,6 @@ class SartopoSession():
                 return -1
             else:
                 if returnJson=="ID":
-                    print(json.dumps(rj,indent=3))
                     id=None
                     if 'result' in rj and 'id' in rj['result']:
                         id=rj['result']['id']
@@ -302,13 +301,25 @@ class SartopoSession():
                 if returnJson=="ALL":
                     return rj
         
-    def addFolder(self,label="New Folder"):
+    def addFolder(self,
+            label="New Folder",
+            queue=False):
         j={}
         j['properties']={}
         j['properties']['title']=label
         return self.sendRequest("post","folder",j,returnJson="ID")
     
-    def addMarker(self,lat,lon,title="New Marker",description="",color="#FF0000",symbol="point",rotation=None,folderId=None,existingId=""):
+    def addMarker(self,
+            lat,
+            lon,
+            title='New Marker',
+            description='',
+            color='#FF0000',
+            symbol='point',
+            rotation=None,
+            folderId=None,
+            existingId=None,
+            queue=False):
         j={}
         jp={}
         jg={}
@@ -317,7 +328,7 @@ class SartopoSession():
         jp['marker-color']=color
         jp['marker-symbol']=symbol
         jp['title']=title
-        if folderId:
+        if folderId is not None:
             jp['folderId']=folderId
         jp['description']=description
         jg['type']='Point'
@@ -325,12 +336,195 @@ class SartopoSession():
         j['properties']=jp
         j['geometry']=jg
         j['type']='Feature'
-        if existingId:
+        if existingId is not None:
             j['id']=existingId
-        #print("sending json: "+json.dumps(j,indent=3))
-        return self.sendRequest("post","marker",j,id=existingId,returnJson="ID")
+        # print("sending json: "+json.dumps(j,indent=3))
+        if queue:
+            self.queue.setdefault('Marker',[]).append(j)
+            return 0
+        else:
+            return self.sendRequest('post','marker',j,id=existingId,returnJson='ID')
 
-    def addIncTrack(self,cnt,points,startTrack,title="New Track",since=0,description="",folderId=None,existingId=""):
+    def addLine(self,
+            points,
+            title='New Line',
+            description='',
+            width=2,
+            opacity=1,
+            color='#FF0000',
+            pattern='solid',
+            folderId=None,
+            existingId=None,
+            queue=False):
+        j={}
+        jp={}
+        jg={}
+        jp['title']=title
+        if folderId is not None:
+            jp['folderId']=folderId
+        jp['description']=description
+        jp['stroke-width']=width
+        jp['stroke-opacity']=opacity
+        jp['stroke']=color
+        jp['pattern']=pattern
+        jg['type']='LineString'
+        jg['coordinates']=points
+        j['properties']=jp
+        j['geometry']=jg
+        if existingId is not None:
+            j['id']=existingId
+        # print("sending json: "+json.dumps(j,indent=3))
+        return self.sendRequest("post","Shape",j,id=existingId,returnJson="ID")
+
+    def addLineAssignment(self,
+            points,
+            number=None,
+            letter=None,
+            opId=None,
+            folderId=None,
+            resourceType='GROUND',
+            teamSize=0,
+            priority='LOW',
+            responsivePOD='LOW',
+            unresponsivePOD='LOW',
+            cluePOD='LOW',
+            description='',
+            previousEfforts='',
+            transportation='',
+            timeAllocated='',
+            primaryFrequency='',
+            secondaryFrequency='',
+            preparedBy='',
+            gpstype='TRACK',
+            status='DRAFT',
+            existingId=None,
+            queue=False):
+        j={}
+        jp={}
+        jg={}
+        if number is not None:
+            jp['number']=number
+        if letter is not None:
+            jp['letter']=letter
+        if opId is not None:
+            jp['operationalPeriod']=opId
+        if folderId is not None:
+            jp['folderId']=folderId
+        jp['resourceType']=resourceType
+        jp['teamSize']=teamSize
+        jp['priority']=priority
+        jp['responsivePOD']=responsivePOD
+        jp['unresponsivePOD']=unresponsivePOD
+        jp['cluePOD']=cluePOD
+        jp['description']=description
+        jp['previousEfforts']=previousEfforts
+        jp['transportation']=transportation
+        jp['timeAllocated']=timeAllocated
+        jp['primaryFrequency']=primaryFrequency
+        jp['secondaryFrequency']=secondaryFrequency
+        jp['preparedBy']=preparedBy
+        jp['gpstype']=gpstype
+        jp['status']=status
+        jg['type']='LineString'
+        jg['coordinates']=points
+        j['properties']=jp
+        j['geometry']=jg
+        if existingId is not None:
+            j['id']=existingId
+        # print("sending json: "+json.dumps(j,indent=3))
+        return self.sendRequest('post','Assignment',j,id=existingId,returnJson='ID')
+
+    # buffers: in the web interface, adding a buffer results in two requests:
+    #   1. api/v0/geodata/buffer - payload = drawn centerline, response = polygon points
+    #   2. api/v1/map/<mapID>/Assignment or /Shape - payload = as usual, using the 
+    #        response from the previous request as the list of polygon points, with
+    #        geometry type = Polygon
+    #   so, while it may be quicker to just perform the buffer calculation here
+    #       and avoid the need to do the first request, the algorithm may be complicated and
+    #       should stay consistent, so it's probably safest to do both requests just as the
+    #       web interface does.
+
+    # def getBufferPoints(self,centerLinePoints,size):
+    #     j={}
+    #     jg={}
+    #     jg['type']='LineString'
+    #     jg['coordinates']=centerLinePoints
+    #     j['geometry']=jg
+    #     j['size']=size
+    #     rj=self.sendRequest('post','api/v0/geodata/buffer',j,None,returnJson='ALL')
+    #     print('generated buffer response:'+json.dumps(rj,indent=3))
+    #     return rj
+
+    def addAreaAssignment(self,
+            points,
+            number=None,
+            letter=None,
+            opId=None,
+            folderId=None,
+            resourceType='GROUND',
+            teamSize=0,
+            priority='LOW',
+            responsivePOD='LOW',
+            unresponsivePOD='LOW',
+            cluePOD='LOW',
+            description='',
+            previousEfforts='',
+            transportation='',
+            timeAllocated='',
+            primaryFrequency='',
+            secondaryFrequency='',
+            preparedBy='',
+            gpstype='TRACK',
+            status='DRAFT',
+            existingId=None,
+            queue=False):
+        j={}
+        jp={}
+        jg={}
+        if number is not None:
+            jp['number']=number
+        if letter is not None:
+            jp['letter']=letter
+        if opId is not None:
+            jp['operationalPeriod']=opId
+        if folderId is not None:
+            jp['folderId']=folderId
+        jp['resourceType']=resourceType
+        jp['teamSize']=teamSize
+        jp['priority']=priority
+        jp['responsivePOD']=responsivePOD
+        jp['unresponsivePOD']=unresponsivePOD
+        jp['cluePOD']=cluePOD
+        jp['description']=description
+        jp['previousEfforts']=previousEfforts
+        jp['transportation']=transportation
+        jp['timeAllocated']=timeAllocated
+        jp['primaryFrequency']=primaryFrequency
+        jp['secondaryFrequency']=secondaryFrequency
+        jp['preparedBy']=preparedBy
+        jp['gpstype']=gpstype
+        jp['status']=status
+        jg['type']='Polygon'
+        jg['coordinates']=[points]
+        j['properties']=jp
+        j['geometry']=jg
+        if existingId is not None:
+            j['id']=existingId
+        # print("sending json: "+json.dumps(j,indent=3))
+        if queue:
+            self.queue.setdefault('Assignment',[]).append(j)
+            return 0
+        else:
+            return self.sendRequest('post','Assignment',j,id=existingId,returnJson='ID')
+
+    def flush(self):
+        self.sendRequest('post','api/v0/map/[MAPID]/save',self.queue)
+        self.queue={}
+
+    # def center(self,lat,lon,z):
+    #     .
+
+    def addAppTrack(self,points,cnt=None,startTrack=True,title="New AppTrack",since=0,description="",folderId=None,existingId=""):
         j={}
         jp={}
         jg={}
@@ -344,45 +538,45 @@ class SartopoSession():
         jg['type']='LineString'
         jg['coordinates']=points
         jg['incremental']=True
+        if cnt is None:
+            cnt=len(points)
         jg['size']=cnt       # cnt includes number of coord in this call
         j['properties']=jp
         j['geometry']=jg
         j['type']='Feature'
-        if 0 == 1:      ## set for no existing ID
+        # if 0 == 1:      ## set for no existing ID
         ###if existingId:
-            j['id']=existingId   # get ID from first call - using Shape
-        else:
-            existingId = ""
+            # j['id']=existingId   # get ID from first call - using Shape
+        # else:
+        existingId = ""
         #print("sending json: "+json.dumps(j,indent=3))
         #print("ID:"+str(existingId))
-        if 1 == 1:
+        # if 1 == 1:
         ##if startTrack == 1:
-            print("At request first time track"+str(existingId)+":"+str(j))
-            return self.sendRequest("post","Shape",j,id=str(existingId),returnJson="ID")
-        else:
-            print("At request adding points to track:"+str(existingId)+":"+str(since)+":"+str(j))
-            return self.sendRequest("post","since/"+str(since),j,id=str(existingId),returnJson="ID")
+        print("At request first time track"+str(existingId)+":"+str(j))
+        return self.sendRequest("post","Shape",j,id=str(existingId),returnJson="ID")
+        # else:
+        #     print("At request adding points to track:"+str(existingId)+":"+str(since)+":"+str(j))
+        #     return self.sendRequest("post","since/"+str(since),j,id=str(existingId),returnJson="ID")
 
     def delMarker(self,existingId=""):
-        return self.sendRequest("delete","marker",None,id=existingId,returnJson="ALL")
-
+        self.delObject("marker",existingId=existingId)
 
     def delObject(self,objType,existingId=""):
-        print("In delete:"+objType+":"+str(existingId))
+        # print("In delete:"+objType+":"+str(existingId))
         ###return self.sendRequest("delete","since/0",None,id=str(existingId),returnJson="ALL")
         return self.sendRequest("delete",objType,None,id=str(existingId),returnJson="ALL")
 
-
     def getFeatures(self,featureClass=None,since=0):
-        rj=self.sendRequest("get","since/"+str(since),None,returnJson="ALL")
-        if not featureClass:
+        rj=self.sendRequest('get','since/'+str(since),None,returnJson='ALL')
+        if featureClass is None:
             return rj # if no feature class is specified, return the entire json response
         else:
             rval=[]
             if 'result' in rj and 'state' in rj['result'] and 'features' in rj['result']['state']:
                 features=rj['result']['state']['features']
                 for feature in features:
-#                     print("FEATURE:"+str(feature))
+#                     print('FEATURE:'+str(feature))
 #                     id=feature['id']
                     prop=feature['properties']
                     if prop['class']==featureClass:

@@ -11,6 +11,7 @@
 import platform
 from kivy.app import App
 from kivy.logger import Logger
+from kivy.config import Config
 from plyer import gps
 from kivy.uix.label import Label
 from kivy.uix.button import Button
@@ -20,6 +21,7 @@ from kivy.uix.floatlayout import FloatLayout
 from kivy.uix.textinput import TextInput
 from kivy.uix.togglebutton import ToggleButton
 from kivy.clock import Clock
+from kivy.core.window import Window
 from oscpy.server import OSCThreadServer
 from sartopo_python import SartopoSession
 from android.permissions import request_permissions, Permission, check_permission
@@ -32,6 +34,7 @@ activityport = 3001
 serviceport  = 3000
 SERVICE_NAME = u'{packagename}.Service{servicename}'.format(packagename=u'org.kivy.LEchk', servicename=u'Keepalive')
 osc = OSCThreadServer()
+#### Config.set('kivy','exit_on_escape','0')  # disables operation of escape button
 
 ##  see defines below in code
 # ANDROID 
@@ -45,9 +48,21 @@ def main():
 
     app = GPSApp()
     print("At main")
+    Window.bind(on_request_close=GPSApp.check_close)
     app.run()
+    
+
+#def check_close(self, **kwargs):
+#    print('AAA BBB CCC')
+#    if self.chk_end_proc == 0:
+#       chk_end_proc = 1
+#       return True
+#    else:
+#       return False
 
 class GPSApp(App):
+    chk_end_proc = 0
+
     def build(self):           ## called at start of program execution
         #
 
@@ -77,6 +92,10 @@ class GPSApp(App):
         self.ID = None
         self.imt.mURLx = ""
         self.imt.csignx = ""
+        self.ActMapSet = 0
+        print('@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@%s'%self)
+        
+        self.ActMap_mapID = '1DE6'
         self.cnt = 0
         self.since = 0        # time of previous save to sartopo
         ###self.startTrack = 1
@@ -138,6 +157,15 @@ class GPSApp(App):
         print("Fart")   ##  printed in log
 
 
+    def check_close(self, **kwargs):
+        print('AAA BBB CCC')
+        if GPSApp.chk_end_proc == 0:
+           GPSApp.chk_end_proc = 1
+           return True
+        else:
+           osc.send_message(b'/ui_api', ["END_TASK".encode('utf8'), ], '127.0.0.1', activityport)
+           return False
+
     def on_location(self, **kwargs):  ## called at GPS input
         Logger.info("Called on_location")
         self.vals = []
@@ -169,16 +197,37 @@ class GPSApp(App):
         mapID=parse[-1]
         print("At send message - timer in UI")
         osc.send_message(b'/ui_api', ["THIS IS UI at SARTOPO>>>>>>>>>>>>>>>>>>>>>>>>".encode('utf8'), ], '127.0.0.1', activityport)
+        self.link = -1      # reset value for next check
         if self.SARTOPO == 1 and self.imt.confirm == 1:    # mURL and csign need to be set
-           if "sartopo" in domainAndPort:
+####  insert conn to ActiveMapsList 1DE6 to save off this URL to enable combiner checking at the server
+          if self.ActMapSet == 0:
+            if "sartopo" in domainAndPort:
+              self.sts=SartopoSession(domainAndPort=domainAndPort,mapID=self.ActMap_mapID,
+                                         configpath=self.stsfile,
+                                         account=self.accountName)
+            else:
+              self.sts=SartopoSession(domainAndPort=domainAndPort,mapID=self.ActMap_mapID)
+            self.link=self.sts.apiVersion      ## if returns -1 do not have connection; if so call above
+                                              #    again and recheck
+            Logger.info("API version:"+' '+str(self.link))                  
+          if self.link == -1:  
+            Logger.info("No connection to server:%i"% self.Resume)
+            if self.Resume != -1:              # wait for answer to Resume question
+               self.imt.info.text = "No connection to server"
+            self.imt.info.foreground_color = (1,0,0,1)
+            return       # no connection 
+          self.ActMapSet = 1
+          result = self.sts.addMarker("39.27","-121.02",title=self.imt.mURLx) # add marker having URL NAME
+
+        if "sartopo" in domainAndPort:    # check this map's URL
               self.sts=SartopoSession(domainAndPort=domainAndPort,mapID=mapID,
                                          configpath=self.stsfile,
                                          account=self.accountName)
-           else:
+        else:
               self.sts=SartopoSession(domainAndPort=domainAndPort,mapID=mapID)
-           self.link=self.sts.apiVersion      ## if returns -1 do not have connection; if so call above
+        self.link=self.sts.apiVersion      ## if returns -1 do not have connection; if so call above
                                               #    again and recheck
-           Logger.info("API version:"+' '+str(self.link))                  
+        Logger.info("API version:"+' '+str(self.link))                  
         if self.link == -1:  
            Logger.info("No connection to server:%i"% self.Resume)
            if self.Resume != -1:              # wait for answer to Resume question
