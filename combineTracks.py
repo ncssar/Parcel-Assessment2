@@ -75,6 +75,7 @@ class GPSApp(App):
         self.sts = None
         self.link = -1
         self.foldAT = ""
+        self.ActMapID = '1DE6'
         self.sortTrack = {}   # define as dictionary
         self.ID = None
         self.getGPSloc = 1    # flag to save GPS loc to track on next tick 
@@ -111,22 +112,52 @@ class GPSApp(App):
 
 
     def on_timer(self, event):        ## called at timer tick
-        Logger.critical("At timer service")  # str(self.track))   
-        print("AT TIMER IN SERVICE"+str(event))
+      Logger.critical("At timer service")  # str(self.track))   
+      print("AT TIMER IN SERVICE"+str(event))
 
 ###### can do the following any time the mURLx changes value when SARTOPO and confirm == 1
 
-        self.mURLx =  "NFTR"  ##"RV0D"
-        self.url="sartopo.com/m/"+self.mURLx+"/" # last "/" for change in parse split for ext
-                   ## "/N166JPDK9NP44HST"     ## need to put after field filled-in`
-        ##$ self.url="localhost:8080/m/K63"         ## need to put after field filled-in`
-        parse=self.url.replace("http://","").replace("https://","").split("/")
-        domainAndPort=parse[0]
-        mapID=parse[-2]
-        ext="/"+parse[-1]
+      self.mURLx =  "TEST"  ##"RV0D"
+      self.url="sartopo.com/m/"+self.mURLx  # last "/" for change in parse split for ext
+                 ## "/N166JPDK9NP44HST"     ## need to put after field filled-in`
+      ##$ self.url="localhost:8080/m/K63"         ## need to put after field filled-in`
+      parse=self.url.replace("http://","").replace("https://","").split("/")
+      domainAndPort=parse[0]
+      mapID=parse[-1]
+  ###
+  #
+  #   loop thru markers in map 1DE6, set mapID and process
+  #
+  #
+  ###
+      if "sartopo.com" in domainAndPort:    ### look for Act Map pointers
+              self.sts=SartopoSession(domainAndPort=domainAndPort,mapID=self.ActMapID,
+                                         configpath=self.stsfile,
+                                         account=self.accountName)
+      else:
+              self.sts=SartopoSession(domainAndPort=domainAndPort,mapID=self.ActMapID)
+      self.link=self.sts.apiVersion      ## if returns -1 do not have connection; if so call above
+                                              #    again and recheck
+      Logger.info("API version:"+' '+str(self.link))
+           
+      if self.link == -1:  
+           Logger.info("No connection to server from SERVER")
+           return       # no connection 
+      ## read marker folder
+      folders = self.sts.getFeatures("Marker")
+      print("At folders:%s"%str(json.dumps(folders,indent=2)))
+      for folder in folders:
+        print("FOLDER:%s"%folder)
+        if folder["properties"]["class"] == "Marker":
+                 print("found folder"+str(folder))
+                 self.foldAT = folder["id"]
+                 mapID = folder['properties']['title'] 
+                 print('MAPID:'+mapID)
+                 if mapID == "initialize":  ## this is marker used to create folder 
+                     continue
         if 1 == 1:
            if "sartopo.com" in domainAndPort: 
-              self.sts=SartopoSession(domainAndPort=domainAndPort,mapID=mapID,ext=ext,
+              self.sts=SartopoSession(domainAndPort=domainAndPort,mapID=mapID,
                                          configpath=self.stsfile,
                                          account=self.accountName)
            else:
@@ -134,11 +165,6 @@ class GPSApp(App):
            self.link=self.sts.apiVersion      ## if returns -1 do not have connection; if so call above
                                               #    again and recheck
            Logger.info("API version:"+' '+str(self.link))
-           return    ##TEST
-
-
-
-
            
         if self.link == -1:  
            Logger.info("No connection to server from SERVER")
@@ -148,11 +174,11 @@ class GPSApp(App):
 
         if self.foldAT == "":   # get folder id (only once)
            folders = self.sts.getFeatures("Folder")
-           print("At folders:%s"%folders)
+           print("At folders:%s"%str(json.dumps(folders,indent=2)))
            for folder in folders:
               print("FOLDER:%s"%folder)
               if folder["properties"]["title"] == "AppTrack":
-                print("found folder")
+                print("found folder"+str(folder))
                 self.foldAT = folder["id"]
         Logger.info("Server connected")
         #
@@ -191,8 +217,8 @@ class GPSApp(App):
       ####  present sartopo_python always creates a new shape id, so would want to
       ####    delete all of the previous pieces              
       ##              
-                result = self.sts.addIncTrack(len(combo),combo,startTrack,title=key,description='', \
-                                              since=0,existingId=ids[0],folderId=self.foldAT)  # new, get id
+                result = self.sts.addAppTrack(combo,cnt=len(combo),startTrack=1,title=key,description='', \
+                                              existingId=ids[0],folderId=self.foldAT)  # new, get id
                 print("RESULT:"+str(result))
             ##  then remove all other ids
                 ####for idx in ids[1:]:

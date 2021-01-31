@@ -7,7 +7,7 @@
 ##
 ###
 
-### need LEmarkers folder to exist on map
+### need AppTrack and LEmarkers folders to exist on map
 import platform
 from kivy.app import App
 from kivy.logger import Logger
@@ -126,7 +126,7 @@ class GPSApp(App):
            self.csignx = dec_mess[2] 
            self.confirm = int(dec_mess[3]) 
        elif dec_mess[0] == "END_TASK":
-            self.kill = 1
+           self.kill = 1
 
     def on_location(self, **kwargs):  ## called at GPS input
         Logger.info("Called on_location SERVICE")
@@ -175,19 +175,23 @@ class GPSApp(App):
               self.sts=SartopoSession(domainAndPort=domainAndPort,mapID=mapID)
            self.link=self.sts.apiVersion      ## if returns -1 do not have connection; if so call above
                                               #    again and recheck
-           Logger.info("API version:"+' '+str(self.link))                  
+           Logger.info("API version server:"+' '+str(self.link))                  
         if self.link == -1:  
            Logger.info("No connection to server from SERVER")
            return       # no connection 
 #####   got connection so put stuff on the map
         if self.foldAT == "":   # get folder id (only once)
            folders = self.sts.getFeatures("Folder")
+           fndFolder = 0
            for folder in folders:
               print("FOLDER:%s"%folder)
               if folder["properties"]["title"] == "AppTrack":
                 print("found folder at")
                 self.foldAT = folder["id"]
-        Logger.info("Server connected")
+                fndFolder = 1
+           if fndFolder == 0:
+              self.sts.addFolder(label="AppTrack")
+        Logger.info("Server connected server")
         ## update the track
         #
         #   How about making the track from pieces of LineString each time there is connection to the server

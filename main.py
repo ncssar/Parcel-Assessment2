@@ -7,7 +7,7 @@
 ##
 ###
 
-### need LEmarkers folder to exist on map
+### need AppTrack and LEmarkers folders to exist on map
 import platform
 from kivy.app import App
 from kivy.logger import Logger
@@ -210,43 +210,54 @@ class GPSApp(App):
             self.link=self.sts.apiVersion      ## if returns -1 do not have connection; if so call above
                                               #    again and recheck
             Logger.info("API version:"+' '+str(self.link))                  
+            if self.link == -1:  
+              Logger.info("No connection to server chk act map:%i"% self.Resume)
+              return       # no connection 
+            self.ActMapSet = 1
+            folders = self.sts.getFeatures("Marker")
+            print("At folders:%s"%str(json.dumps(folders,indent=2)))
+            fndMarker = 0
+            for folder in folders:
+              print("FOLDER:%s"%folder)
+              if folder["properties"]["class"] == "Marker":
+                 print("found folder"+str(folder))
+                 if mapID == folder['properties']['title']:   # chk if marker for this map exist in act map db
+                    fndMarker = 1
+            if fndMarker == 0:
+              result = self.sts.addMarker("39.27","-121.02",title=self.imt.mURLx) # add marker having URL NAME
+
+          if "sartopo" in domainAndPort:    # check this map's URL
+              self.sts=SartopoSession(domainAndPort=domainAndPort,mapID=mapID,
+                                         configpath=self.stsfile,
+                                         account=self.accountName)
+          else:
+              self.sts=SartopoSession(domainAndPort=domainAndPort,mapID=mapID)
+          self.link=self.sts.apiVersion      ## if returns -1 do not have connection; if so call above
+                                              #    again and recheck
+          Logger.info("API version:"+' '+str(self.link))                  
           if self.link == -1:  
             Logger.info("No connection to server:%i"% self.Resume)
             if self.Resume != -1:              # wait for answer to Resume question
                self.imt.info.text = "No connection to server"
             self.imt.info.foreground_color = (1,0,0,1)
             return       # no connection 
-          self.ActMapSet = 1
-          result = self.sts.addMarker("39.27","-121.02",title=self.imt.mURLx) # add marker having URL NAME
-
-        if "sartopo" in domainAndPort:    # check this map's URL
-              self.sts=SartopoSession(domainAndPort=domainAndPort,mapID=mapID,
-                                         configpath=self.stsfile,
-                                         account=self.accountName)
-        else:
-              self.sts=SartopoSession(domainAndPort=domainAndPort,mapID=mapID)
-        self.link=self.sts.apiVersion      ## if returns -1 do not have connection; if so call above
-                                              #    again and recheck
-        Logger.info("API version:"+' '+str(self.link))                  
-        if self.link == -1:  
-           Logger.info("No connection to server:%i"% self.Resume)
-           if self.Resume != -1:              # wait for answer to Resume question
-               self.imt.info.text = "No connection to server"
-           self.imt.info.foreground_color = (1,0,0,1)
-           return       # no connection 
         #####   got connection so put stuff on the map
-        if self.foldLEm == "":                # get folder id (only once)
-           folders = self.sts.getFeatures("Folder")
-           for folder in folders:
+          if self.foldLEm == "":                # get folder id (only once)
+            folders = self.sts.getFeatures("Folder")
+            fndFolder = 0
+            for folder in folders:
               print("FOLDER:%s"%folder)
               if folder["properties"]["title"] == "LEmarkers":
                 self.foldLEm = folder["id"]
-        Logger.info("Server connected")
-        self.imt.info.text = "Server connected"
-        self.imt.info.foreground_color = (0,1,0,1)
+                fndFolder = 1
+            if fndFolder == 0:
+              self.sts.addFolder(label="LEmarkers")  # create the folder
+          Logger.info("Server connected")
+          self.imt.info.text = "Server connected"
+          self.imt.info.foreground_color = (0,1,0,1)
         ## sequence through markers (look for new ones; checkoff as sent)
-        for mark in self.markers:
-           if mark[4] == 0:
+          for mark in self.markers:
+            if mark[4] == 0:
               print("B4 marker call")
               result = self.sts.addMarker(mark[0],mark[1],title=self.imt.csignx,description=mark[3],symbol=mark[2],folderId=self.foldLEm) # add marker
               print("AFT marker call")
@@ -320,6 +331,7 @@ class imtext(FloatLayout):            ## builds the UI
         self.mURLx = self.mURL.text
         self.csignx = self.csign.text
         self.confirm = 1
+        self.GPSPTR.ActMapSet = 0   # reset flag as map url may have changed
         mess = "URL_CSIGN:"+self.mURLx+":"+self.csignx+":"+str(self.confirm)
         osc.send_message(b'/ui_api', [mess.encode('utf8'),], '127.0.0.1', activityport)
 
