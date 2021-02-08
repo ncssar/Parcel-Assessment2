@@ -23,6 +23,7 @@ from shapely.geometry import LineString
 from shapely.strtree import STRtree
 from timezonefinder import TimezoneFinder
 from datetime import datetime, timezone
+import time
 import pytz
 from shapely.ops import nearest_points
 from shapely.geometry import shape
@@ -99,7 +100,7 @@ class GPSApp(App):
 ## location of marker
         self.mrktype = 'NC'                          # temporary - from markers found on the map
         self.mrkX = Point([-121.064745, 39.143876])  # temporary - from markers found on the map
-        print("mrkX:",self.mrkX)
+        #print("mrkX:",self.mrkX)
      #self.timem = 'date/time'                    # temporary - from real marker info found on map (was in indx)
         self.callsign = '1D23'                       # temporary - from callsign of closest LE found on the map
         fpdat = open('parcel_markers.txt','w')
@@ -217,6 +218,7 @@ class GPSApp(App):
                 #print("found folder"+str(folder))
                 self.foldAT = folder["id"]
         Logger.info("Server connected")
+        print("time:"+str(time.time()))
         #
         #   How about making the track from pieces of LineString each time there is connection to the server
         #
@@ -274,7 +276,9 @@ class GPSApp(App):
 ####
 ## run on timer - loop
 ####
-        print("Starting Marker updates")
+        #print("Starting Marker updates")
+        self.mrkr = []
+        self.mrkInfo = []
 #        self.loopGo  = True        # start loop
 #        while (self.loopGo):       # wait for timer   DO NOT NEED AS OUTER LOOP HAS TIMER
 #          self.loopGo = False
@@ -302,7 +306,7 @@ class GPSApp(App):
             long = self.mrkInfo[icnt][0][0][0]
             msym = self.mrkInfo[icnt][1]
                    #   fill in description:  address/ time
-            print("ID:", idx,titl,'[',desc,']',msym,lat,long)
+            #Q#print("ID:", idx,titl,'[',desc,']',msym,lat,long)
                    # add arguments:  lat, long, (title, description, color, symbol, rotation, folderId, existingId) 
                    ### might want to add: updated
                    ### doing update
@@ -312,21 +316,19 @@ class GPSApp(App):
 
     def loadNCparcels(self):
    ##  load Nevada County parcel data
-      with open("c:\\users\\steve\\downloads\\parcel_situs_address.geojson") as fi:  # get all NC parcels
+      with open("c:\\process_TrackMarker\\parcel_situs_address.geojson") as fi:  # get all NC parcels
         data = json.load(fi)
-      print('Length of data:',len(data))
+      print('Length of situs data:%i'%(len(data)))
       return(data)
      
     def readLEMarker(self):
-   ## load tracks, specifically AppTrack for LE paths
-   ## Use Timer to recheck AppTrack every so often from map at sartopo.com
    
  #$    with open("c:\\users\\steve\\downloads\\Map_Items.json") as fi2:  # get all NC parcels
  #$      tracks = geojson.load(fi2)
 
       items = self.sts.getFeatures(None)
       timestamp = items['result']['timestamp']    # time when data is collected
-      print('Length of items:',len(items),"\n",items,timestamp)
+      #print('Length of items:',len(items),"\n",items,timestamp)
 
       for ix in items['result']['state']['features']:  #get id of LEmarkers folder
         if ix['properties']['title'] == "LEmarkers":
@@ -346,26 +348,26 @@ class GPSApp(App):
         
          ##### only process Points as these are markers            ## point
         if ix['geometry']['type'] == 'Point' and ix['properties']['class'] == 'Marker' and \
-            ix['properties']['folderId'] == self.idLEmark:
+            ix['properties']['folderId'] == self.idLEmark and 'description' not in ix['properties'].keys():
           coordxy = [ix['geometry']['coordinates']]     # from app, this includes long, lat, elev (m), epoch
-          print("#3", coordxy)
+          #print("#3", coordxy)
             
           timesx = ix['properties']['updated']        # epoch at gmt/UTC
           if timesx == 0:                             # if updated is not filled-in
             timesx = timestamp
           latx = coordxy[0][1]                        # use any coord long/lat
           longx = coordxy[0][0]
-          print("timesx",timesx,"##",latx,"##",longx,"##")
+          #print("timesx",timesx,"##",latx,"##",longx,"##")
           tf = TimezoneFinder()                       # get timezone name
           tza = tf.timezone_at(lng=longx,lat=latx)
           utc_dt = datetime.fromtimestamp(timesx/1e3) # convert epoch (msec) str to datetime format (sec)
           tz = pytz.timezone(tza)                     # convert tz name to utc offset
           dt = utc_dt.astimezone(tz)                  # convert time utc to this timezone
-          print('timestamp:',timesx,';',tza,';',dt)
+          #print('timestamp:',timesx,';',tza,';',dt)
           makeCoord = []
           for xx in coordxy:                          # extract coord to make LineString for Shapely
              makeCoord.append([xx[0], xx[1]]) 
-          print("COORDS:",makeCoord)
+          #print("COORDS:",makeCoord)
 ##
 #### only add if did not exist, OR update
 ##
@@ -376,7 +378,7 @@ class GPSApp(App):
           for li in self.mrkInfo:        # search for pre-existance
             if li[4] == "":             # description is blank prior to processing
                ifnd = 1
-               print('Marker exists',ix['properties'])
+               #print('Marker exists',ix['properties'])
                break
           if ifnd == 0:     
             self.mrkr.append(Point(makeCoord[0]))     ###  create version for Shapely
@@ -385,7 +387,7 @@ class GPSApp(App):
             self.mrkInfo.append([coordxy, ix['properties']['marker-symbol'],
                                  "addr_holder", dt, "holder_for_callsign",idx,titl])
                                                      ## need symbol & assoc'd callsign - how to get??
-            print("Marker:",self.mrkInfo,":",[list(self.mrkr[i].coords) for i in range(len(self.mrkr))])
+            #print("Marker:",self.mrkInfo,":",[list(self.mrkr[i].coords) for i in range(len(self.mrkr))])
               
         
     def createTree(self,data):
@@ -431,10 +433,11 @@ class GPSApp(App):
         resFnd = res                  # resFnd is the parcel record of the parcel with the Marker
         if parMrk == True: break
       if parMrk:  
-        print("PARCEL MARKER:",parMrk, resFnd, "\nID=", id(resFnd))
-        print("    Addr is ",self.indx[id(resFnd)][1])
+        #Q#print("PARCEL MARKER:",parMrk, resFnd, "\nID=", id(resFnd))
+        #Q#print("    Addr is ",self.indx[id(resFnd)][1])
+        pass
       else:
-        print("ERROR: Marker not in any parcel")      
+          print("ERROR: Marker not in any parcel: "+str(Point(self.mrkr[mptr].coords)))      
       return(parMrk, resFnd)    # parMrk is true if result is found
 
 

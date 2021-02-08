@@ -199,15 +199,9 @@ class GPSApp(App):
         # run algorithm
         print("CODE, EXIST:"+str(self.code)+':'+str(self.exist))
         if self.code != "" and self.exist == 0:   # do this if code is non-zero and file does not exist
-                sum = 0
-                for ix in range(0,16):
-                    if self.idPhone[ix].isnumeric():
-                        val = self.idPhone[ix]
-                    else:
-                        val = 'abcdef'.find(self.idPhone[ix]) +10   # hex conversion
-                    sum = sum + int(val) * (ix*1000 + 1)
-                csum = str(sum)
-                code2 = csum[-6:]
+'''
+section redacted
+'''
                 print('CODE:'+str(code2))
          # compare, say OK or reenter, set auth 
                 if self.code == code2:
