@@ -1,13 +1,14 @@
 [app]
 
 # (str) Title of your application
-title = LEcheck
+title = LEcheck2
 
 # (str) Package name
 package.name = LEchk
 
 # (str) Package domain (needed for android/ios packaging)
-package.domain = org.kivy
+package.domain = org.levy
+###package.domain = org.kivy
 
 # (str) Source code where the main.py live
 source.dir = .
@@ -90,12 +91,14 @@ fullscreen = 0
 
 # (list) Permissions
 #android.permissions = INTERNET
-android.permissions = READ_EXTERNAL_STORAGE, INTERNET, ACCESS_NETWORK_STATE, ACCESS_FINE_LOCATION, ACCESS_COARSE_LOCATION, READ_PHONE_STATE, READ_PHONE_NUMBERS, READ_SMS 
+android.permissions = READ_EXTERNAL_STORAGE, INTERNET, ACCESS_NETWORK_STATE, ACCESS_FINE_LOCATION, ACCESS_COARSE_LOCATION, FOREGROUND_SERVICE
+###### READ_PHONE_STATE, READ_PHONE_NUMBERS, READ_SMS 
 # (list) features (adds uses-feature -tags to manifest)
 #android.features = android.hardware.usb.host
 
 # (int) Target Android API, should be as high as possible.
-android.api = 27
+android.api = 30
+###android.api = 27
 
 # (int) Minimum API your APK will support.
 #android.minapi = 21
@@ -224,11 +227,13 @@ android.api = 27
 #android.copy_libs = 1
 
 # (str) The Android arch to build for, choices: armeabi-v7a, arm64-v8a, x86, x86_64
-android.arch = armeabi-v7a
+android.arch = arm64-v8a
+###android.arch = armeabi-v7a
 
 # (int) overrides automatic versionCode computation (used in build.gradle)
 # this is not the same as app version and should only be edited if you know what you're doing
-# android.numeric_version = 1
+# 8212 goes with v8a
+android.numeric_version = 8213
 
 # (bool) enables Android auto backup feature (Android API >=23)
 android.allow_backup = True

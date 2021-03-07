@@ -73,6 +73,7 @@ class GPSApp(App):
         self.foldAT = ""
         self.ID = None
         self.cnt = 0
+        self.timedown = 3     # preset value
         self.since = 0        # time of previous save to sartopo
         self.startTrack = 1
         self.getGPSloc = 1    # flag to save GPS loc to track on next tick 
@@ -88,8 +89,8 @@ class GPSApp(App):
             if (curTime - mtime) < 84600:    # within a day
                pass   #### if all of the above is Okay, look for message from UI to say 'resume'
                #print("resume time check in service")
-               
-        self.accountName="ncssarnc@gmail.com"     ## obviscate  ## redact
+### start redact               
+### end redact               
 ###   add in self.accountName="<acct>"
         #print("B4 sartopo")
         if self.SARTOPO == 1:
@@ -127,6 +128,8 @@ class GPSApp(App):
            self.confirm = int(dec_mess[3]) 
        elif dec_mess[0] == "END_TASK":
            self.kill = 1
+       ###elif dec_mess[0][0:8] == "WATCHDOG":   # preset timeout counter that when it expires server should stop
+       ###    self.timedown = 3
 
     def on_location(self, **kwargs):  ## called at GPS input
         #Logger.info("Called on_location SERVICE")
@@ -147,6 +150,9 @@ class GPSApp(App):
         #print("AT TIMER IN SERVICE"+str(event))
         self.getGPSloc = 1    # set flag to save gps location update to track
         self.timerCnt += 1
+        ###self.timedown = self.timedown - 1   # decrease timeout when heartbeat from UI is not seen
+        ###if self.timedown <= 0:
+        ###   self.kill = 1                    # set flag to stop server
         if self.timerCnt < self.TIMEOUT:
            return       # wait to do the following
         self.timerCnt = 0        

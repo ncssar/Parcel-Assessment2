@@ -53,26 +53,24 @@ os.environ['SSL_CERT_FILE'] = certifi.where()
 def main():
 
     app = GPSApp()
-    #print("At main")
-    Window.bind(on_request_close=GPSApp.check_close)
+    ## print("At main")
     app.run()
     
 
 
 class GPSApp(App):
-    chk_end_proc = 0
+    chk_end_proc = 0           ## initialize count to heck for app stop, end, kill
 
     def build(self):           ## called at start of program execution
         #
-
         plat = platform.architecture()
-        print("ARCH1:%s"%str(plat))
+       ## print("ARCH1:%s"%str(plat))
         if "Win" in plat[1]:
-           self.ANDROID = 0       ###  running on ANDROID or PC ???
+           self.ANDROID = 0    ###  running on ANDROID or PC ???
         else:
            self.ANDROID = 1
            from android import AndroidService
-           service = AndroidService('Keepalive', 'running')
+           service = AndroidService('Keepalive', 'running')   ## START background service for capturing a track
            service.start('service started')
            #print("After service start")
 
@@ -94,7 +92,7 @@ class GPSApp(App):
         self.ActMapSet = 0
         #print('@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@%s'%self)
         
-        self.ActMap_mapID = '1DE6'
+        self.ActMap_mapID = '1DE6'   ## URL of map used as database for Active Maps
         self.cnt = 0
         self.since = 0        # time of previous save to sartopo
         ###self.startTrack = 1
@@ -113,9 +111,9 @@ class GPSApp(App):
         self.auth = 0
         self.exist = 0 
         if os.path.isfile(self.save_path2):                      # file exists ?
-            self.exist = 1
+            self.exist = 1                          # if file exists implies auth completed and URL/callsign confirmed 
                 #chk if auth set, if not chk auth
-        else:   # init authorizaion
+        else:   # init authorization
             self.idPhone = uniqueid.id
             self.imt.info.text = self.idPhone   # phone id     have user enter 6 digit cidr and hit enter to move forward
                                                 #              that will set auth in file
@@ -133,13 +131,14 @@ class GPSApp(App):
                self.Resume = 0     # set to 0 indicating do not need to ask question
         else:
            self.Resume = 0
-        self.accountName="ncssarnc@gmail.com"     ## obviscate  ## redact
+### start redact
+### end redact
 ###   add in self.accountName="<acct>"
         if self.SARTOPO == 1:
            #print("AT REQUEST")
            if self.ANDROID == 1:
               request_permissions([Permission.READ_EXTERNAL_STORAGE, Permission.ACCESS_FINE_LOCATION, 
-                                   Permission.ACCESS_COARSE_LOCATION, Permission.READ_PHONE_STATE])
+                                   Permission.ACCESS_COARSE_LOCATION, Permission.READ_PHONE_STATE, Permission.FOREGROUND_SERVICE])
            self.stsfile = "./sts.ini"    ## should use more general path resolution
            ###self.stsfile = "/storage/emulated/0/kivy/sts.ini"    ## should use more general path resolution
         return(self.imt)   ##causes window to be displayed
@@ -168,18 +167,9 @@ class GPSApp(App):
                 on_location=self.on_location
             )
             gps.start()
-        osc.send_message(b'/ui_api', ["THIS IS UI>>>>>>>>>>>>>>>>>>>>>>>>".encode('utf8'), ], '127.0.0.1', activityport)
-        #print("Fart")   ##  printed in log
+        osc.send_message(b'/ui_api', ["THIS IS UI".encode('utf8'), ], '127.0.0.1', activityport)
+        #print("Fart")   ## printed in log
 
-
-    def check_close(self, **kwargs):
-        #print('AAA BBB CCC')
-        if GPSApp.chk_end_proc == 0:
-           GPSApp.chk_end_proc = 1
-           return True
-        else:
-           osc.send_message(b'/ui_api', ["END_TASK".encode('utf8'), ], '127.0.0.1', activityport)
-           return False
 
     def on_location(self, **kwargs):  ## called at GPS input
         #Logger.info("Called on_location")
@@ -194,44 +184,45 @@ class GPSApp(App):
 
     def on_timer(self, event):        ## called at timer tick
         #Logger.critical(str(self.markers))   
-        Logger.critical(self.imt.mURLx)
-        print("Timer called",self.imt.mURLx,self.imt.csignx)
+       ## Logger.critical(self.imt.mURLx)
+       ## print("Timer called",self.imt.mURLx,self.imt.csignx)
+        #print("At send message - timer in UI")
+        ###osc.send_message(b'/ui_api', ["WATCHDOG from server".encode('utf8'), ], '127.0.0.1', activityport)
         # run algorithm
-        print("CODE, EXIST:"+str(self.code)+':'+str(self.exist))
+       ## print("CODE, EXIST:"+str(self.code)+':'+str(self.exist))
         if self.code != "" and self.exist == 0:   # do this if code is non-zero and file does not exist
-'''
-section redacted
-'''
-                print('CODE:'+str(code2))
+### start redact
+### end redact
          # compare, say OK or reenter, set auth 
                 if self.code == code2:
                     self.auth = 1
-                    print('MATCH'+str(self.code))
+                   ## print('MATCH'+str(self.code))
                     with open(self.save_path2, 'w') as outfile:  ## opens, write, closes
                         json.dump([self.auth, 0, 0], outfile)    ## write
-                    print('WRITEN'+str(self.auth))
+                   ## print('WRITEN'+str(self.auth))
                     self.imt.info.text = ""
                     self.exist = 1
                 return 
 
 
         self.timerCnt += 1
-        print("AFTER")
         if self.timerCnt < self.TIMEOUT:
            return       # wait to do the following
         self.timerCnt = 0        
+
 ### only get down here every timerTick * TIMEOUT seconds
+
 #      save to file
         with open(self.save_path, 'w') as outfile:  ## opens, saves, closes
-            json.dump([self.markers], outfile) ## save 
+            json.dump([self.markers], outfile) ## save all markers that have not been xfered to server
 
         self.url="sartopo.com/m/"+self.imt.mURLx     ## need to put after field filled-in`
         ##$ self.url="localhost:8080/m/K63"         ## need to put after field filled-in`
         parse=self.url.replace("http://","").replace("https://","").split("/")
         domainAndPort=parse[0]
         mapID=parse[-1]
-        #print("At send message - timer in UI")
-        osc.send_message(b'/ui_api', ["THIS IS UI at SARTOPO>>>>>>>>>>>>>>>>>>>>>>>>".encode('utf8'), ], '127.0.0.1', activityport)
+
+
         self.link = -1      # reset value for next check
         if self.SARTOPO == 1 and self.imt.confirm == 1:    # mURL and csign need to be set
 ####  insert conn to ActiveMapsList 1DE6 to save off this URL to enable combiner checking at the server
@@ -304,7 +295,7 @@ class imtext(FloatLayout):            ## builds the UI
         super(imtext, self).__init__(**kwargs)
         self.GPSPTR = 0   # preset a value
         plat = platform.architecture()
-        print("ARCH3:%s"%str(plat))
+       ## print("ARCH3:%s"%str(plat))
         if "Win" in plat[1]:
            self.ANDROID2 = 0       ###  running on ANDROID or PC ???
            scale = 0.3    
@@ -312,7 +303,7 @@ class imtext(FloatLayout):            ## builds the UI
            self.ANDROID2 = 1
            scale = 1.0
         self.size=(700,2000)   # does not seem to set the initial size
-        print("Here")
+       ## print("Here")
         self.add_widget(Label(text="Enter Map URL",size_hint=(0.1,0.2),pos=(100,scale*1550)))
         self.mURL = TextInput(text='', multiline=False,size_hint=(0.2,0.03),pos=(320,scale*1720))
         self.mURL.bind(on_text_validate=self.on_input)
@@ -346,7 +337,7 @@ class imtext(FloatLayout):            ## builds the UI
         pass               ### also init auth code entry
         if self.GPSPTR.exist == 0:   # in init auth mode, get 6 digit code
              self.GPSPTR.code = self.mURL.text
-        print("URL:", self.mURL.text) 
+        ## print("URL:", self.mURL.text+":"+str(event)) 
         self.mURL.text = ""
 
     def on_input2(self, event):      ## when Callsign entered
@@ -355,7 +346,7 @@ class imtext(FloatLayout):            ## builds the UI
 
     def on_input3(self, event):      ## when stuff entered into info field
         #print("INFO:", self.info.text) 
-        if self.info.text != self.GPSPTR.xmess:
+        if self.info.text != self.GPSPTR.xmess and len(self.info.text) >= 1:
             if self.info.text[-1].lower() == "y":
                 self.GPSPTR.Resume = 1
                 #print("Yes - Resume session:"+self.info.text[-1].lower())
@@ -367,15 +358,46 @@ class imtext(FloatLayout):            ## builds the UI
                 self.confirm = 1
                 mess = "URL_CSIGN:"+self.mURLx+":"+self.csignx+":"+str(self.confirm)
                 osc.send_message(b'/ui_api', [mess.encode('utf8'),], '127.0.0.1', activityport)
+                self.info.text = ""    # clear entry
+            elif self.info.text[-4:].lower() == "quit" or self.info.text[-4:].lower() == "exit": 
+                pass
+                ## print('BLAST OFF')
+                if GPSApp.chk_end_proc == 0:
+                   self.info.text = "Retype to exit:"
+                   GPSApp.chk_end_proc = 1
+                else:
+                   osc.send_message(b'/ui_api', ["END_TASK".encode('utf8'), ], '127.0.0.1', activityport)  # send stop to server task
+                   time.sleep(2)
+                   App.get_running_app().stop()
             else:
                 self.GPSPTR.Resume = 0
-            self.info.text = ""    # clear entry
+                GPSApp.chk_end_proc = 0   # reset flag
+                self.info.text = ""    # clear entry
 
     def on_pressC(self, event):    ## Confirm
         #print("confirmpress:") 
+        self.info.text = ""
         if self.mURL.text == "" or self.csign.text == "":
             self.info.text = "Must enter URL & Csign"
             return
+### check for validity of URL at confirm
+        self.url="sartopo.com/m/"+self.mURL.text     ## need to put after field filled-in`
+        parse=self.url.replace("http://","").replace("https://","").split("/")
+        domainAndPort=parse[0]
+        mapID=parse[-1]
+        if "sartopo" in domainAndPort:
+            self.sts=SartopoSession(domainAndPort=domainAndPort,mapID=mapID,
+                                       configpath=self.GPSPTR.stsfile,
+                                       account=self.GPSPTR.accountName)
+        else:
+            self.sts=SartopoSession(domainAndPort=domainAndPort,mapID=mapID)
+        self.link=self.sts.apiVersion      ## if returns -1 do not have connection; if so call above
+                                              #    again and recheck
+        Logger.info("Check URL, API version:"+' '+str(self.link))                  
+        if self.link == -1:  
+            self.info.text = "URL is invalid, re-enter"
+            return
+
         self.mURLx = self.mURL.text
         self.csignx = self.csign.text
         self.confirm = 1
